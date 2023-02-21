@@ -38,10 +38,7 @@ def findDisparity(window, pad, eq_i, eq_j, img, out, cost_function):
             min_val = val
             disp = eq_j - j
     
-    disp_mutex.acquire()
-    #print(f'Found disparity for ({eq_i - pad}, {eq_j - pad}) = {disp}')
     out[eq_i - pad, eq_j - pad] = disp
-    disp_mutex.release()
     
 
 
@@ -67,7 +64,7 @@ if __name__ == '__main__':
 
     print('PARAMETROS:')
     for arg in arg_dict:
-        print(f'\t{arg} = {arg_dict[arg]}')
+        print(f'  {arg} = {arg_dict[arg]}')
 
     # Nomes das imagens
     img_name = Path(args.img1).stem + '-' + Path(args.img2).stem 
@@ -121,16 +118,9 @@ if __name__ == '__main__':
                 i - pad : i + pad + 1,
                 j - pad : j + pad + 1
             ]
-            # Execução paralela
-            th = threading.Thread(target=findDisparity, args=(window1, pad, i, j, img2, disp_matrix, error_function))
-            th.start()
-            disp_threads.append(th)
+            findDisparity(window1, pad, i, j, img2, disp_matrix, error_function)
     except Exception as e:
         print(e)
-    finally:
-        for th in disp_threads:
-            th.join()
-
     plt.matshow(disp_matrix)
 
     output_filename = 'disparities/'+ error_function_name + '-' + f'{WINDOW_SIZE}x{WINDOW_SIZE}-' + img_name + '-' + timestamp + f'-{width}x{height}'
@@ -139,10 +129,8 @@ if __name__ == '__main__':
     # Salva a matriz resultante e o gráfico
     np.save(output_filename, disp_matrix)
     np.save(output_filename_latest, disp_matrix)
+    
+    cv.imwrite(output_filename_latest + '.png', disp_matrix)
 
     # Mostra resultado
     plt.show()
-    # Normaliza matriz para o maior valor e atribui para grayscale
-    cv.normalize(disp_matrix, disp_matrix, 1.0, 0.0, cv.NORM_INF)
-    disp_matrix = (disp_matrix * 255).astype(int)
-    cv.imwrite(output_filename_latest + '.png', disp_matrix)
