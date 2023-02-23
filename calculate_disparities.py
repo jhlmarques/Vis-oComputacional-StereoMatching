@@ -8,7 +8,6 @@ from tqdm.contrib.itertools import product
 # from itertools import product
 
 import matplotlib.pyplot as plt
-import threading
 import time
 
 
@@ -21,29 +20,6 @@ def robustSSD(window1: np.array, window2: np.array):
     return d_sq / (d_sq + e_sq)
 
 
-disp_mutex = threading.Lock()
-def findDisparity(window, pad, eq_i, eq_j, img, out, cost_function):
-    disp = 200
-    min_val = 100000
-
-    im_width = img.shape[0] - (2*pad)
-
-    for j in range(pad, im_width + pad - 1): 
-        window2 = img[
-            eq_i - pad : eq_i + pad + 1,
-            j - pad : j + pad + 1
-        ]
-        val = cost_function(window, window2)
-        if min_val > val:
-            min_val = val
-            disp = eq_j - j
-    
-    out[eq_i - pad, eq_j - pad] = disp
-    
-
-
-
-
 if __name__ == '__main__':
 
     timestamp = time.strftime("%Y-%m-%d-%H-%M-%S")
@@ -52,8 +28,9 @@ if __name__ == '__main__':
         prog='Calculate Disparities',
         description='Calcula matriz de disparidades entre duas images'
     )
-    parser.add_argument('img1')
-    parser.add_argument('img2')
+    parser.add_argument('left_img')
+    parser.add_argument('right_img')
+    parser.add_argument('-s', '--search_range', type=int, default=16)
     parser.add_argument('-w', '--window', type=int, default=1)
     parser.add_argument('-r', '--robust', action='store_true')
     parser.add_argument('-re', '--robust_value', type=int, default=5)
@@ -67,12 +44,14 @@ if __name__ == '__main__':
         print(f'  {arg} = {arg_dict[arg]}')
 
     # Nomes das imagens
-    img_name = Path(args.img1).stem + '-' + Path(args.img2).stem 
-    img_name1 = args.img1
-    img_name2 = args.img2
+    img_name = Path(args.left_img).stem + '-' + Path(args.right_img).stem 
+    img_name1 = args.left_img
+    img_name2 = args.right_img
     # Tamanho da janela
     WINDOW_SIZE = args.window
-    pad = max(0, WINDOW_SIZE - 2)
+    kernel_half = max(0, WINDOW_SIZE // 2)
+    # Intervalo de calculo de disparidade (à esquerda)
+    search_range = args.search_range
     # Função de erro
     if args.robust:
         global robust_e 
@@ -98,38 +77,63 @@ if __name__ == '__main__':
     height, width = img1.shape[0], img1.shape[1]
 
     # Conversão para CIELAB
-    cv.cvtColor(img1, cv.COLOR_BGR2LAB, img1)
-    cv.cvtColor(img2, cv.COLOR_BGR2LAB, img2)
+    img1 = cv.cvtColor(img1, cv.COLOR_BGR2LAB)
+    img2 = cv.cvtColor(img2, cv.COLOR_BGR2LAB)
  
-    # Padding
-    if pad > 0:
-        img1 = cv.copyMakeBorder(img1, pad, pad, pad, pad, cv.BORDER_CONSTANT, (0,0));
-        img2 = cv.copyMakeBorder(img2, pad, pad, pad, pad, cv.BORDER_CONSTANT, (0,0));
-
     disp_matrix = np.zeros((height, width))
 
-    disp_threads = []
-    try:
-        # Para cada pixel, obtém sua janela de vizinhos e calcula erro
-        # for i, j in product(range(pad, height + pad), range(pad, width + pad)):
-        for i, j in product(range(pad, height + pad), range(pad, width + pad), miniters=updateinterval):
-            # Janelas
-            window1 = img1[
-                i - pad : i + pad + 1,
-                j - pad : j + pad + 1
+
+    # Para cada pixel, obtém sua janela de vizinhos e calcula erro
+    # for i, j in product(range(kernel_half, height + kernel_half), range(kernel_half, width + kernel_half)):
+    for i, j in product(range(kernel_half, height - kernel_half), range(kernel_half, width - kernel_half), miniters=updateinterval):
+        # print('----')
+        # print(i, j)
+        # Janelas
+        window1 = img1[
+            i - kernel_half : i + kernel_half + 1,
+            j - kernel_half : j + kernel_half + 1
+        ]
+
+        min_val = 999999
+        disp = 0
+
+        window_y1 = i - kernel_half
+        window_y2 = i + kernel_half + 1
+        window_x1 = j - kernel_half
+        window_x2 = j + kernel_half + 1
+
+        # print(window_y1, window_y2)
+        # print(window_x1, window_x2)
+
+        maximum_offset = min(search_range, window_x1)
+
+        # Considerando que comparamos a câmera direita com a esquerda, pixels
+        # moveriam-se à esquerda
+        for offset in range(maximum_offset):
+            window2 = img2[
+                window_y1 : window_y2,
+                window_x1 - offset : window_x2 - offset
             ]
-            findDisparity(window1, pad, i, j, img2, disp_matrix, error_function)
-    except Exception as e:
-        print(e)
+            val = error_function(window1, window2)
+            if min_val > val:
+                min_val = val
+                disp = offset
+        disp_matrix[i, j] = disp
+
+
     plt.matshow(disp_matrix)
 
-    output_filename = 'disparities/'+ error_function_name + '-' + f'{WINDOW_SIZE}x{WINDOW_SIZE}-' + img_name + '-' + timestamp + f'-{width}x{height}'
-    output_filename_latest = 'disparities/latest/'+ error_function_name + '-' + f'{WINDOW_SIZE}x{WINDOW_SIZE}-' + img_name
+    output_filename = 'disparities/'+ error_function_name + '-' + f'{WINDOW_SIZE}x{WINDOW_SIZE}-' + f'd{search_range}-' + img_name + '-' + timestamp + f'-{width}x{height}'
+    output_filename_latest = 'disparities/latest/'+ error_function_name + '-' + f'{WINDOW_SIZE}x{WINDOW_SIZE}-' + f'd{search_range}-' + img_name
 
     # Salva a matriz resultante e o gráfico
     np.save(output_filename, disp_matrix)
     np.save(output_filename_latest, disp_matrix)
     
+    # Normaliza matriz para o maior valor e atribui para grayscale
+    cv.normalize(disp_matrix, disp_matrix, 1.0, 0.0, cv.NORM_INF)
+    disp_matrix = (disp_matrix * 255).astype(int)
+
     cv.imwrite(output_filename_latest + '.png', disp_matrix)
 
     # Mostra resultado
