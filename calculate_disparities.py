@@ -16,8 +16,8 @@ def SSD(window1: np.array, window2: np.array):
     return np.sum((window1 - window2)**2)
 
 def robustSSD(window1: np.array, window2: np.array):
-    d_sq = np.sum((window1 - window2)**2)
-    return d_sq / (d_sq + e_sq)
+    d_sq = np.sum((window1 - window2)**2, axis=2)
+    return np.sum(d_sq / (d_sq + e_sq))
 
 
 if __name__ == '__main__':
@@ -30,10 +30,10 @@ if __name__ == '__main__':
     )
     parser.add_argument('left_img')
     parser.add_argument('right_img')
-    parser.add_argument('-s', '--search_range', type=int, default=16)
-    parser.add_argument('-w', '--window', type=int, default=1)
+    parser.add_argument('-s', '--search_range', type=int, default=64)
+    parser.add_argument('-w', '--window', type=int, default=3)
     parser.add_argument('-r', '--robust', action='store_true')
-    parser.add_argument('-re', '--robust_value', type=int, default=5)
+    parser.add_argument('-re', '--robust_value', type=float, default=20)
     parser.add_argument('-ui', '--updateinterval', type=int, default=1000)
 
     args = parser.parse_args()
@@ -120,7 +120,7 @@ if __name__ == '__main__':
                 disp = offset
         disp_matrix[i, j] = disp
 
-
+    plt.style.use('grayscale')
     plt.matshow(disp_matrix)
 
     output_filename = 'disparities/'+ error_function_name + '-' + f'{WINDOW_SIZE}x{WINDOW_SIZE}-' + f'd{search_range}-' + img_name + '-' + timestamp + f'-{width}x{height}'
