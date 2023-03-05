@@ -39,6 +39,11 @@ if __name__ == "__main__":
     img_gt = cv.imread(f'{args.file_prefix}_disp2.png', cv.IMREAD_GRAYSCALE).astype(np.float64)
     img_gt /= 4
 
+
+
+    print(f"Avaliação quantitativa para '{args.file_prefix}' {f'função robusta com e={args.robust_value}' if args.robust else 'SSD'}, janela {WINDOW_SIZE}x{WINDOW_SIZE} e disparidade máxima {DISPARITY_MAX}")
+    print("------------------------------------------------------------------------")
+
     print(f'RMSE: {RMSE(img, img_gt)}')
     print(f'Bad Pixels: {bad_pixels(img, img_gt)}')
     
