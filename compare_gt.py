@@ -17,7 +17,6 @@ if __name__ == "__main__":
     parser.add_argument('window_size', type=int)
     parser.add_argument('file_prefix')
     parser.add_argument('-r', '--robust', action='store_true')
-    parser.add_argument('-re', '--robust_value', type=float, default=20)
     parser.add_argument('-d', '--disparity_max', type=int, default=64)
 
     args = parser.parse_args()
@@ -28,7 +27,7 @@ if __name__ == "__main__":
     search_dir = 'disparities/latest/'
     
     if args.robust:
-        search_dir += 'robustSSD_' + str(args.robust_value)
+        search_dir += 'ZSSD'
     else:
         search_dir += 'SSD'
     search_dir += '-'
@@ -41,7 +40,7 @@ if __name__ == "__main__":
 
 
 
-    print(f"Avaliação quantitativa para '{args.file_prefix}' {f'função robusta com e={args.robust_value}' if args.robust else 'SSD'}, janela {WINDOW_SIZE}x{WINDOW_SIZE} e disparidade máxima {DISPARITY_MAX}")
+    print(f"Avaliação quantitativa para '{args.file_prefix}' {'ZSSD' if args.robust else 'SSD'}, janela {WINDOW_SIZE}x{WINDOW_SIZE} e disparidade máxima {DISPARITY_MAX}")
     print("------------------------------------------------------------------------")
 
     print(f'RMSE: {RMSE(img, img_gt)}')

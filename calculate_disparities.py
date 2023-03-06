@@ -15,9 +15,9 @@ import time
 def SSD(window1: np.array, window2: np.array):
     return np.sum((window1 - window2)**2)
 
+#ZSSD. Assume que window1 já tem média subtraída
 def robustSSD(window1: np.array, window2: np.array):
-    d_sq = np.sum((window1 - window2)**2, axis=2)
-    return np.sum(d_sq / (d_sq + e_sq))
+    return np.sum((window1 - (window2 - window2.mean()))**2)
 
 
 if __name__ == '__main__':
@@ -33,7 +33,6 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--search_range', type=int, default=64)
     parser.add_argument('-w', '--window', type=int, default=3)
     parser.add_argument('-r', '--robust', action='store_true')
-    parser.add_argument('-re', '--robust_value', type=float, default=20)
     parser.add_argument('-ui', '--updateinterval', type=int, default=1000)
 
     args = parser.parse_args()
@@ -54,13 +53,8 @@ if __name__ == '__main__':
     search_range = args.search_range
     # Função de erro
     if args.robust:
-        global robust_e 
-        global e_sq 
-        robust_e = args.robust_value
-        e_sq = robust_e**2
         error_function = robustSSD
-        error_function_name  = 'robustSSD_' + str(robust_e)  
-
+        error_function_name  = 'ZSSD'
     else:
         error_function = SSD
         error_function_name  = 'SSD'     
@@ -86,13 +80,14 @@ if __name__ == '__main__':
     # Para cada pixel, obtém sua janela de vizinhos e calcula erro
     # for i, j in product(range(kernel_half, height + kernel_half), range(kernel_half, width + kernel_half)):
     for i, j in product(range(kernel_half, height - kernel_half), range(kernel_half, width - kernel_half), miniters=updateinterval):
-        # print('----')
-        # print(i, j)
         # Janelas
         window1 = img1[
             i - kernel_half : i + kernel_half + 1,
             j - kernel_half : j + kernel_half + 1
         ]
+
+        if args.robust:
+            window1 = window1 - window1.mean()
 
         min_val = 999999
         disp = 0
@@ -101,9 +96,6 @@ if __name__ == '__main__':
         window_y2 = i + kernel_half + 1
         window_x1 = j - kernel_half
         window_x2 = j + kernel_half + 1
-
-        # print(window_y1, window_y2)
-        # print(window_x1, window_x2)
 
         maximum_offset = min(search_range, window_x1)
 
@@ -137,4 +129,4 @@ if __name__ == '__main__':
     cv.imwrite(output_filename_latest + '.png', disp_matrix)
 
     # Mostra resultado
-    plt.show()
+    # plt.show()
